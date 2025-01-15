@@ -3,7 +3,7 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from matplotlib import pyplot as plt
-from scipy.stats import kendalltau
+from scipy.stats import kendalltau, spearmanr, pearsonr
 from viral_centrality import viral_centrality  # Make sure this function is accessible
 
 # Load data
@@ -28,7 +28,7 @@ for i, (out_nodes, weights) in enumerate(zip(outList, outWeight)):
         G.add_edge(i, j, weight=weight)
 
 # Function to run ICM simulation
-def run_icm_simulation(G, num_simulations=10000):
+def run_icm_simulation(G, num_simulations=1000):
     spread_sizes = {node: 0 for node in G.nodes}
     for seed_node in G.nodes:
         total_activated = 0
@@ -48,9 +48,8 @@ def run_icm_simulation(G, num_simulations=10000):
     return spread_sizes
 
 # Monte Carlo ground truth
-num_simulations = 10000  # Reduced to 1000 for debugging
+num_simulations = 1000  # Reduced to 1000 for debugging
 avg_spread = run_icm_simulation(G, num_simulations)
-ground_truth_ranking = sorted(avg_spread, key=avg_spread.get, reverse=True)
 
 # Calculate other centralities
 degree_centrality = nx.degree_centrality(G)
@@ -65,59 +64,54 @@ except nx.PowerIterationFailedConvergence:
 tol = 0.001
 viral_centrality_values = viral_centrality(inList, inWeight, outList, Niter=-1, tol=tol)
 
-def get_ranking_from_dict(dct):
-    return sorted(dct, key=dct.get, reverse=True)
+# Convert centrality measures and influence spread to DataFrame
+df = pd.DataFrame({
+    'Node': list(G.nodes),
+    'Degree Centrality': [degree_centrality[node] for node in G.nodes],
+    'Betweenness Centrality': [betweenness_centrality[node] for node in G.nodes],
+    'Closeness Centrality': [closeness_centrality[node] for node in G.nodes],
+    'Eigenvector Centrality': [eigenvector_centrality[node] for node in G.nodes],
+    'Viral Centrality': viral_centrality_values,
+    'Influence Spread': [avg_spread[node] for node in G.nodes]
+})
 
-def get_ranking_from_list(lst):
-    return sorted(range(len(lst)), key=lambda i: lst[i], reverse=True)
-
-degree_ranking = get_ranking_from_dict(degree_centrality)
-betweenness_ranking = get_ranking_from_dict(betweenness_centrality)
-closeness_ranking = get_ranking_from_dict(closeness_centrality)
-eigenvector_ranking = get_ranking_from_dict(eigenvector_centrality)
-viral_ranking = get_ranking_from_list(viral_centrality_values)
-
-# Compare top 10 rankings using Kendall's Tau
-rankings = {
-    'Degree Centrality': degree_ranking,
-    'Betweenness Centrality': betweenness_ranking,
-    'Closeness Centrality': closeness_ranking,
-    'Eigenvector Centrality': eigenvector_ranking,
-    'Viral Centrality': viral_ranking
+# Calculate correlations
+correlations = {
+    'Degree Centrality': pearsonr(df['Degree Centrality'], df['Influence Spread']),
+    'Betweenness Centrality': pearsonr(df['Betweenness Centrality'], df['Influence Spread']),
+    'Closeness Centrality': pearsonr(df['Closeness Centrality'], df['Influence Spread']),
+    'Eigenvector Centrality': pearsonr(df['Eigenvector Centrality'], df['Influence Spread']),
+    'Viral Centrality': pearsonr(df['Viral Centrality'], df['Influence Spread'])
 }
 
-# Extract top 10 from ground truth ranking
-top_10_ground_truth = ground_truth_ranking[:10]
-
-results = []
-for name, ranking in rankings.items():
-    top_10_ranking = ranking[:10]
-    tau, p_value = kendalltau(top_10_ranking, top_10_ground_truth)
-    results.append([name, tau, p_value])
-    print(f"Kendall's Tau between {name} and ground truth ranking (Top 10): {tau:.3f}")
+# Print correlation results
+for name, (corr, p_value) in correlations.items():
+    print(f"Pearson correlation between {name} and Influence Spread: {corr:.3f}")
     print(f"P-value: {p_value:.3g}")
 
-# Create a DataFrame for the results
-df_results = pd.DataFrame(results, columns=['Centrality Measure', 'Kendall\'s Tau', 'P-value'])
+# Visualize the relationship using scatter plots
+fig, axes = plt.subplots(3, 2, figsize=(15, 15))
+axes = axes.flatten()
+
+for i, (name, _) in enumerate(correlations.items()):
+    axes[i].scatter(df[name], df['Influence Spread'])
+    axes[i].set_title(f'{name} vs Influence Spread')
+    axes[i].set_xlabel(name)
+    axes[i].set_ylabel('Influence Spread')
+
+plt.tight_layout()
+plt.savefig('centrality_vs_influence_spread.pdf')
 
 # Save the DataFrame as a table in a PDF
-fig, ax = plt.subplots(figsize=(8, 4))  # Set the size of the figure
+fig, ax = plt.subplots(figsize=(10, 6))  # Set the size of the figure
 ax.axis('tight')
 ax.axis('off')
-table = ax.table(cellText=df_results.values, colLabels=df_results.columns, cellLoc='center', loc='center')
+table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc='center', loc='center')
 table.auto_set_font_size(False)
 table.set_fontsize(10)
 table.scale(1.2, 1.2)  # Adjust the scale of the table
 
 plt.savefig('centrality_kendall_tau_results.pdf', bbox_inches='tight')
-
-# Debugging Print Statements
-print("Degree Centrality Ranking (Top 10):", degree_ranking[:10])
-print("Betweenness Centrality Ranking (Top 10):", betweenness_ranking[:10])
-print("Closeness Centrality Ranking (Top 10):", closeness_ranking[:10])
-print("Eigenvector Centrality Ranking (Top 10):", eigenvector_ranking[:10])
-print("Viral Centrality Ranking (Top 10):", viral_ranking[:10])
-print("Ground Truth Ranking (Top 10):", top_10_ground_truth)
 
 
 

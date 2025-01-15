@@ -64,9 +64,13 @@ except nx.PowerIterationFailedConvergence:
 tol = 0.001
 viral_centrality_values = viral_centrality(inList, inWeight, outList, Niter=-1, tol=tol)
 
+# Normalize viral centrality values
+viral_centrality_values = (viral_centrality_values - np.min(viral_centrality_values)) / (np.max(viral_centrality_values) - np.min(viral_centrality_values))
+
 # Convert centrality measures and influence spread to DataFrame
 df = pd.DataFrame({
     'Node': list(G.nodes),
+    'Username': [usernameList[node] for node in G.nodes],
     'Degree Centrality': [degree_centrality[node] for node in G.nodes],
     'Betweenness Centrality': [betweenness_centrality[node] for node in G.nodes],
     'Closeness Centrality': [closeness_centrality[node] for node in G.nodes],
@@ -112,6 +116,19 @@ table.set_fontsize(10)
 table.scale(1.2, 1.2)  # Adjust the scale of the table
 
 plt.savefig('centrality_kendall_tau_results.pdf', bbox_inches='tight')
+
+# Extract and display the top ten influential users based on influence spread
+top_10_influential_users = df.nlargest(10, 'Influence Spread')
+print("Top 10 Influential Users:")
+print(top_10_influential_users[['Username', 'Influence Spread']])
+
+# Debugging Print Statements
+print("Degree Centrality Ranking (Top 10):", degree_ranking[:10])
+print("Betweenness Centrality Ranking (Top 10):", betweenness_ranking[:10])
+print("Closeness Centrality Ranking (Top 10):", closeness_ranking[:10])
+print("Eigenvector Centrality Ranking (Top 10):", eigenvector_ranking[:10])
+print("Viral Centrality Ranking (Top 10):", viral_ranking[:10])
+print("Ground Truth Ranking (Top 10):", top_10_ground_truth)
 
 
 

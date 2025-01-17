@@ -1,6 +1,7 @@
 import json
 import networkx as nx
 from matplotlib import pyplot as plt
+import community.community_louvain as community_louvain
 
 # Load the JSON dataset
 with open('congress_network_data.json', 'r') as f:
@@ -416,7 +417,7 @@ partyAffiliation = {
     'RepLindaSanchez': 'Democratic',
     'RepSarbanes': 'Democratic',
     'SteveScalise': 'Republican',
-    'RepMGS': 'Republican',
+    'RepMGS': 'Democratic',
     'janschakowsky': 'Democratic',
     'RepAdamSchiff': 'Democratic',
     'RepSchneider': 'Democratic',
@@ -536,6 +537,40 @@ def analyze_subgraph(subgraph, name):
 analyze_subgraph(republican_subgraph, "Republican")
 analyze_subgraph(democratic_subgraph, "Democratic")
 
+# Identify nodes with high infiltration ratio
+infiltration_nodes = []
+for node in G.nodes():
+    current_party = G.nodes[node]['party']
+    neighbors = list(G.successors(node)) + list(G.predecessors(node))
+    if not neighbors: 
+        continue
+    same_count = 0
+    opp_count = 0
+    for nbr in neighbors:
+        if G.nodes[nbr]['party'] == current_party:
+            same_count += 1
+        else:
+            opp_count += 1
+    
+    # Calculate infiltration ratio
+    ratio = opp_count / (same_count + opp_count)
+    if ratio > 0.5:
+        infiltration_nodes.append(node)
+
+print("Nodes with high infiltration ratio:")
+for node in infiltration_nodes:
+    print(G.nodes[node]['label'])
+
+# List of Twitter handles to highlight
+highlight_handles = [
+    'RoyBlunt', 'SenAngusKing', 'Sen_JoeManchin', 'lisamurkowski', 'senrobportman',
+    'SenSanders', 'SenatorSinema', 'RepDonBacon', 'RepChuck', 'RepCarlos',
+    'RepMMM', 'RepJimmyPanetta', 'RepThompson'
+]
+
+# Find nodes corresponding to the handles to highlight
+highlight_nodes = [n for n, d in G.nodes(data=True) if d['label'] in highlight_handles]
+
 # Draw the full network with party colors
 pos = nx.spring_layout(G)  # Position nodes using Fruchterman-Reingold force-directed algorithm
 plt.figure(figsize=(12, 12))
@@ -544,6 +579,10 @@ plt.figure(figsize=(12, 12))
 node_colors = ['red' if G.nodes[n]['party'] == 'Republican' else 'blue' for n in G.nodes()]
 nx.draw_networkx_nodes(G, pos, node_size=500, node_color=node_colors)
 
+# Highlight specified nodes in green
+if highlight_nodes:
+    nx.draw_networkx_nodes(G, pos, nodelist=highlight_nodes, node_color='green', node_size=700)
+
 # Draw edges
 nx.draw_networkx_edges(G, pos, arrowstyle='->', arrowsize=10, edge_color='gray')
 
@@ -551,4 +590,5 @@ nx.draw_networkx_edges(G, pos, arrowstyle='->', arrowsize=10, edge_color='gray')
 nx.draw_networkx_labels(G, pos, labels=nx.get_node_attributes(G, 'label'), font_size=10)
 
 plt.title('Congressional Twitter Network')
+plt.savefig('Figure_1.png')
 plt.show()

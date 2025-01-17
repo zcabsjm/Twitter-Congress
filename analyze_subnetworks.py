@@ -1,6 +1,8 @@
 import json
 import networkx as nx
 from matplotlib import pyplot as plt
+import pandas as pd
+from pandas.plotting import table
 
 # Load the JSON dataset
 with open('congress_network_data.json', 'r') as f:
@@ -416,7 +418,7 @@ partyAffiliation = {
     'RepLindaSanchez': 'Democratic',
     'RepSarbanes': 'Democratic',
     'SteveScalise': 'Republican',
-    'RepMGS': 'Republican',
+    'RepMGS': 'Democratic',
     'janschakowsky': 'Democratic',
     'RepAdamSchiff': 'Democratic',
     'RepSchneider': 'Democratic',
@@ -515,37 +517,43 @@ democratic_subgraph = G.subgraph(democratic_nodes)
 
 # Analyze structural properties
 def analyze_subgraph(subgraph, name):
-    print(f"Analysis of {name} Subnetwork")
-    print(f"Number of nodes: {subgraph.number_of_nodes()}")
-    print(f"Number of edges: {subgraph.number_of_edges()}")
-    print(f"Average degree: {sum(dict(subgraph.degree()).values()) / subgraph.number_of_nodes()}")
-    print(f"Average clustering coefficient: {nx.average_clustering(subgraph)}")
+    num_nodes = subgraph.number_of_nodes()
+    num_edges = subgraph.number_of_edges()
+    avg_degree = round(sum(dict(subgraph.degree()).values()) / num_nodes, 2)
+    avg_clustering = round(nx.average_clustering(subgraph), 2)
     
-    # Handle disconnected graph
     if nx.is_strongly_connected(subgraph):
-        avg_shortest_path_length = nx.average_shortest_path_length(subgraph)
+        avg_shortest_path_length = round(nx.average_shortest_path_length(subgraph), 2)
+        diameter = nx.diameter(subgraph)
     else:
         largest_cc = max(nx.strongly_connected_components(subgraph), key=len)
         largest_subgraph = subgraph.subgraph(largest_cc)
-        avg_shortest_path_length = nx.average_shortest_path_length(largest_subgraph)
+        avg_shortest_path_length = round(nx.average_shortest_path_length(largest_subgraph), 2)
+        diameter = nx.diameter(largest_subgraph)
     
-    print(f"Average shortest path length: {avg_shortest_path_length}")
-    print(f"Diameter: {nx.diameter(largest_subgraph)}")
-    print()
+    return {
+        'Subnetwork': name,
+        'Number of Nodes': num_nodes,
+        'Number of Edges': num_edges,
+        'Average Degree': avg_degree,
+        'Average Clustering Coefficient': avg_clustering,
+        'Average Shortest Path Length': avg_shortest_path_length,
+        'Diameter': diameter
+    }
 
-analyze_subgraph(republican_subgraph, "Republican")
-analyze_subgraph(democratic_subgraph, "Democratic")
+# Analyze both subgraphs
+republican_analysis = analyze_subgraph(republican_subgraph, "Republican")
+democratic_analysis = analyze_subgraph(democratic_subgraph, "Democratic")
 
-# Plot degree distributions
-def plot_degree_distribution(subgraph, name):
-    degrees = [d for n, d in subgraph.degree()]
-    plt.hist(degrees, bins=range(1, max(degrees) + 1), alpha=0.5, label=name)
+# Create a DataFrame
+df = pd.DataFrame([republican_analysis, democratic_analysis])
 
-plt.figure(figsize=(10, 6))
-plot_degree_distribution(republican_subgraph, "Republican")
-plot_degree_distribution(democratic_subgraph, "Democratic")
-plt.xlabel('Degree')
-plt.ylabel('Frequency')
-plt.legend()
-plt.title('Degree Distribution')
+# Plot the table
+fig, ax = plt.subplots(figsize=(10, 2))  # Set the size of the figure
+ax.axis('tight')
+ax.axis('off')
+tbl = table(ax, df, loc='center', cellLoc='center', colWidths=[0.15]*len(df.columns))
+
+# Save the table as a PNG image
+plt.savefig('subnetworks_analysis.png', bbox_inches='tight', dpi=300)
 plt.show()

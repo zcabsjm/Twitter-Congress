@@ -4,18 +4,15 @@ from matplotlib import pyplot as plt
 import pandas as pd
 from pandas.plotting import table
 
-# Load the JSON dataset
 with open('congress_network_data.json', 'r') as f:
     data = json.load(f)
 
-# Extract data from JSON
 inList = data[0]['inList']
 inWeight = data[0]['inWeight']
 outList = data[0]['outList']
 outWeight = data[0]['outWeight']
 usernameList = data[0]['usernameList']
 
-# Manually add party affiliation (example data)
 partyAffiliation = {
     'SenatorBaldwin': 'Democratic',
     'SenJohnBarrasso': 'Republican',
@@ -495,12 +492,11 @@ partyAffiliation = {
     'RepLeeZeldin': 'Republican'
 }
 
-# Create a directed graph
 G = nx.DiGraph()
 
 # Add nodes with labels and party affiliation
 for i, username in enumerate(usernameList):
-    party = partyAffiliation.get(username, 'Unknown')  # Default to 'Unknown' if not found
+    party = partyAffiliation.get(username, 'Unknown')  # Defaults to Unknown if not found
     G.add_node(i, label=username, party=party)
 
 # Add edges with weights from JSON data
@@ -548,7 +544,6 @@ def analyze_subgraph(subgraph, name):
 republican_analysis = analyze_subgraph(republican_subgraph, "Republican")
 democratic_analysis = analyze_subgraph(democratic_subgraph, "Democratic")
 
-# Print the analysis results
 print("Republican Subgraph Analysis:")
 for key, value in republican_analysis.items():
     print(f"{key}: {value}")
@@ -557,15 +552,12 @@ print("\nDemocratic Subgraph Analysis:")
 for key, value in democratic_analysis.items():
     print(f"{key}: {value}")
 
-# Create a DataFrame
 df = pd.DataFrame([republican_analysis, democratic_analysis])
 
-# Plot the table
-fig, ax = plt.subplots(figsize=(10, 2))  # Set the size of the figure
+fig, ax = plt.subplots(figsize=(10, 2))  
 ax.axis('tight')
 ax.axis('off')
 tbl = table(ax, df, loc='center', cellLoc='center', colWidths=[0.15]*len(df.columns))
 
-# Save the table as a PNG image
 plt.savefig('subnetworks_analysis.png', bbox_inches='tight', dpi=300)
 plt.show()

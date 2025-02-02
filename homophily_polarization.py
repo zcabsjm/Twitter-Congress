@@ -3,18 +3,16 @@ import networkx as nx
 from matplotlib import pyplot as plt
 import community.community_louvain as community_louvain
 
-# Load the JSON dataset
 with open('congress_network_data.json', 'r') as f:
     data = json.load(f)
 
-# Extract data from JSON
 inList = data[0]['inList']
 inWeight = data[0]['inWeight']
 outList = data[0]['outList']
 outWeight = data[0]['outWeight']
 usernameList = data[0]['usernameList']
 
-# Manually add party affiliation (example data)
+# Manually add party affiliation 
 partyAffiliation = {
     'SenatorBaldwin': 'Democratic',
     'SenJohnBarrasso': 'Republican',

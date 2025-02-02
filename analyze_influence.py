@@ -1,16 +1,17 @@
 import json
+import math
 import numpy as np
 import networkx as nx
 import pandas as pd
 from matplotlib import pyplot as plt
 from scipy.stats import kendalltau
-from viral_centrality import viral_centrality  # Make sure this function is accessible
+from viral_centrality import viral_centrality 
+from collections import defaultdict
 
-# Load data
+
 with open('congress_network_data.json') as f:
     data = json.load(f)
 
-# Extract data from JSON
 inList = data[0]['inList']
 inWeight = data[0]['inWeight']
 outList = data[0]['outList']
@@ -62,7 +63,6 @@ except nx.PowerIterationFailedConvergence:
 tol = 0.001
 viral_centrality_values = viral_centrality(inList, inWeight, outList, Niter=-1, tol=tol)
 
-# Debugging: Print viral centrality values
 print("Viral Centrality Values:", viral_centrality_values)
 
 def get_ranking_from_dict(dct):
@@ -76,8 +76,6 @@ viral_ranking = get_ranking_from_list(viral_centrality_values)
 
 # Compute weighted PageRank centrality
 def weighted_pagerank_centrality(G, alpha=0.85, max_iter=100, tol=1.0e-6):
-    import math
-
     N = len(G)
     if N == 0:
         return {}
@@ -124,9 +122,6 @@ def prob_degree_centrality(G):
     return centrality
 
 def prob_betweenness_centrality(G):
-    from collections import defaultdict
-    import math
-
     betweenness = defaultdict(float)
     nodes = list(G.nodes())
     
@@ -204,7 +199,7 @@ prob_degree_ranking = get_ranking_from_dict(prob_degree)
 prob_betweenness_ranking = get_ranking_from_dict(prob_betweenness)
 prob_closeness_ranking = get_ranking_from_dict(prob_closeness)
 
-# Compare top 10% rankings using Kendall's Tau
+# Compare top 10% rankings using Kendal's Tau
 rankings = {
     'Eigenvector Centrality': eigenvector_ranking,
     'Viral Centrality': viral_ranking,
@@ -214,7 +209,6 @@ rankings = {
     'Prob Closeness Centrality': prob_closeness_ranking
 }
 
-# Extract top 10% from ground truth ranking
 top_10_percent_index = int(len(ground_truth_ranking) * 0.1)
 top_10_percent_ground_truth = ground_truth_ranking[:top_10_percent_index]
 
@@ -226,21 +220,18 @@ for name, ranking in rankings.items():
     print(f"Kendall's Tau between {name} and ground truth ranking (Top 10%): {tau:.3f}")
     print(f"P-value: {p_value:.3g}")
 
-# Create a DataFrame for the results
 df_results = pd.DataFrame(results, columns=['Centrality Measure', 'Kendall\'s Tau', 'P-value'])
 
-# Save the DataFrame as a table in a PDF
-fig, ax = plt.subplots(figsize=(8, 4))  # Set the size of the figure
+fig, ax = plt.subplots(figsize=(8, 4))  
 ax.axis('tight')
 ax.axis('off')
 table = ax.table(cellText=df_results.values, colLabels=df_results.columns, cellLoc='center', loc='center')
 table.auto_set_font_size(False)
 table.set_fontsize(10)
-table.scale(1.2, 1.2)  # Adjust the scale of the table
+table.scale(1.2, 1.2)  
 
 plt.savefig('centrality_kendall_tau_results.pdf', bbox_inches='tight')
 
-# Debugging Print Statements
 print("Eigenvector Centrality Ranking (Top 10%):", eigenvector_ranking[:top_10_percent_index])
 print("Viral Centrality Ranking (Top 10%):", viral_ranking[:top_10_percent_index])
 print("Weighted PageRank Ranking (Top 10%):", weighted_pagerank_ranking[:top_10_percent_index])

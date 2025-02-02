@@ -519,20 +519,21 @@ democratic_subgraph = G.subgraph(democratic_nodes)
 def analyze_subgraph(subgraph, name):
     num_nodes = subgraph.number_of_nodes()
     num_edges = subgraph.number_of_edges()
-    avg_degree = round(sum(dict(subgraph.degree()).values()) / num_nodes, 2)
-    avg_clustering = round(nx.average_clustering(subgraph), 2)
+    avg_degree = sum(dict(subgraph.degree()).values()) / num_nodes
+    avg_clustering = nx.average_clustering(subgraph)
     
+    # Handle disconnected graph
     if nx.is_strongly_connected(subgraph):
-        avg_shortest_path_length = round(nx.average_shortest_path_length(subgraph), 2)
-        diameter = nx.diameter(subgraph)
+        avg_shortest_path_length = nx.average_shortest_path_length(subgraph)
     else:
         largest_cc = max(nx.strongly_connected_components(subgraph), key=len)
         largest_subgraph = subgraph.subgraph(largest_cc)
-        avg_shortest_path_length = round(nx.average_shortest_path_length(largest_subgraph), 2)
-        diameter = nx.diameter(largest_subgraph)
+        avg_shortest_path_length = nx.average_shortest_path_length(largest_subgraph)
     
-    return {
-        'Subnetwork': name,
+    diameter = nx.diameter(largest_subgraph)
+    
+    analysis = {
+        'Subgraph': name,
         'Number of Nodes': num_nodes,
         'Number of Edges': num_edges,
         'Average Degree': avg_degree,
@@ -540,10 +541,21 @@ def analyze_subgraph(subgraph, name):
         'Average Shortest Path Length': avg_shortest_path_length,
         'Diameter': diameter
     }
+    
+    return analysis
 
 # Analyze both subgraphs
 republican_analysis = analyze_subgraph(republican_subgraph, "Republican")
 democratic_analysis = analyze_subgraph(democratic_subgraph, "Democratic")
+
+# Print the analysis results
+print("Republican Subgraph Analysis:")
+for key, value in republican_analysis.items():
+    print(f"{key}: {value}")
+
+print("\nDemocratic Subgraph Analysis:")
+for key, value in democratic_analysis.items():
+    print(f"{key}: {value}")
 
 # Create a DataFrame
 df = pd.DataFrame([republican_analysis, democratic_analysis])

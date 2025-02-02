@@ -53,9 +53,6 @@ avg_spread = run_icm_simulation(G, num_simulations)
 ground_truth_ranking = sorted(avg_spread, key=avg_spread.get, reverse=True)
 
 # Calculate other centralities
-degree_centrality = nx.degree_centrality(G)
-betweenness_centrality = nx.betweenness_centrality(G, weight='weight')
-closeness_centrality = nx.closeness_centrality(G, distance='weight')
 try:
     eigenvector_centrality = nx.eigenvector_centrality(G, max_iter=1000, tol=1e-06, weight='weight')
 except nx.PowerIterationFailedConvergence:
@@ -65,36 +62,168 @@ except nx.PowerIterationFailedConvergence:
 tol = 0.001
 viral_centrality_values = viral_centrality(inList, inWeight, outList, Niter=-1, tol=tol)
 
+# Debugging: Print viral centrality values
+print("Viral Centrality Values:", viral_centrality_values)
+
 def get_ranking_from_dict(dct):
     return sorted(dct, key=dct.get, reverse=True)
 
 def get_ranking_from_list(lst):
     return sorted(range(len(lst)), key=lambda i: lst[i], reverse=True)
 
-degree_ranking = get_ranking_from_dict(degree_centrality)
-betweenness_ranking = get_ranking_from_dict(betweenness_centrality)
-closeness_ranking = get_ranking_from_dict(closeness_centrality)
 eigenvector_ranking = get_ranking_from_dict(eigenvector_centrality)
 viral_ranking = get_ranking_from_list(viral_centrality_values)
 
-# Compare top 10 rankings using Kendall's Tau
+# Compute weighted PageRank centrality
+def weighted_pagerank_centrality(G, alpha=0.85, max_iter=100, tol=1.0e-6):
+    import math
+
+    N = len(G)
+    if N == 0:
+        return {}
+
+    pr = {node: 1.0 / N for node in G.nodes()}
+
+    out_strength = {}
+    for node in G.nodes():
+        total_weight_out = 0.0
+        for nbr in G.successors(node):
+            total_weight_out += G[node][nbr].get('weight', 0.0)
+        out_strength[node] = total_weight_out
+
+    for _ in range(max_iter):
+        prev_pr = pr.copy()
+        for node in pr:
+            pr[node] = (1.0 - alpha) / N
+
+        for node in G.nodes():
+            if out_strength[node] == 0:
+                for n2 in pr:
+                    pr[n2] += alpha * (prev_pr[node] / N)
+            else:
+                for nbr in G.successors(node):
+                    w = G[node][nbr].get('weight', 0.0)
+                    pr[nbr] += alpha * (prev_pr[node] * (w / out_strength[node]))
+
+        diff = sum(abs(pr[n] - prev_pr[n]) for n in pr)
+        if diff < tol:
+            break
+
+    return pr
+
+weighted_pagerank = weighted_pagerank_centrality(G)
+weighted_pagerank_ranking = get_ranking_from_dict(weighted_pagerank)
+
+# Compute probabilistic centralities
+def prob_degree_centrality(G):
+    centrality = {}
+    for node in G.nodes():
+        out_prob = sum(G[node][nbr]['weight'] for nbr in G.successors(node))
+        in_prob = sum(G[pred][node]['weight'] for pred in G.predecessors(node))
+        centrality[node] = out_prob + in_prob
+    return centrality
+
+def prob_betweenness_centrality(G):
+    from collections import defaultdict
+    import math
+
+    betweenness = defaultdict(float)
+    nodes = list(G.nodes())
+    
+    log_w = {}
+    for u, v in G.edges():
+        log_w[(u, v)] = math.log(G[u][v]['weight']) if G[u][v]['weight'] > 0 else float('-inf')
+
+    for s in nodes:
+        dist = {n: float('inf') for n in nodes}
+        predecessor = {n: None for n in nodes}
+        dist[s] = 0
+        
+        unvisited = set(nodes)
+        while unvisited:
+            current = min(unvisited, key=lambda x: dist[x])
+            unvisited.remove(current)
+            if dist[current] == float('inf'):
+                break
+            for nbr in G.successors(current):
+                cost = dist[current] + (-log_w.get((current, nbr), float('-inf')))
+                if cost < dist[nbr]:
+                    dist[nbr] = cost
+                    predecessor[nbr] = current
+        
+        for t in nodes:
+            if t == s or dist[t] == float('inf'):
+                continue
+            path_nodes = []
+            cur = t
+            while cur is not None:
+                path_nodes.append(cur)
+                cur = predecessor[cur]
+            path_nodes.reverse()
+            for n in path_nodes:
+                betweenness[n] += 1
+    
+    return dict(betweenness)
+
+def prob_closeness_centrality(G):
+    import math
+    
+    closeness = {}
+    nodes = list(G.nodes())
+
+    log_w = {}
+    for u, v in G.edges():
+        log_w[(u, v)] = -math.log(G[u][v]['weight']) if G[u][v]['weight'] > 0 else float('inf')
+
+    for s in nodes:
+        dist = {n: float('inf') for n in nodes}
+        dist[s] = 0
+        visited = set()
+        while len(visited) < len(nodes):
+            current = min((x for x in nodes if x not in visited), key=lambda x: dist[x])
+            visited.add(current)
+            if dist[current] == float('inf'):
+                break
+            for nbr in G.successors(current):
+                d = dist[current] + log_w.get((current, nbr), float('inf'))
+                if d < dist[nbr]:
+                    dist[nbr] = d
+        total = sum(x for x in dist.values() if x < float('inf'))
+        if total > 0 and total < float('inf'):
+            closeness[s] = (len(nodes) - 1) / total
+        else:
+            closeness[s] = 0.0
+
+    return closeness
+
+prob_degree = prob_degree_centrality(G)
+prob_betweenness = prob_betweenness_centrality(G)
+prob_closeness = prob_closeness_centrality(G)
+
+prob_degree_ranking = get_ranking_from_dict(prob_degree)
+prob_betweenness_ranking = get_ranking_from_dict(prob_betweenness)
+prob_closeness_ranking = get_ranking_from_dict(prob_closeness)
+
+# Compare top 10% rankings using Kendall's Tau
 rankings = {
-    'Degree Centrality': degree_ranking,
-    'Betweenness Centrality': betweenness_ranking,
-    'Closeness Centrality': closeness_ranking,
     'Eigenvector Centrality': eigenvector_ranking,
-    'Viral Centrality': viral_ranking
+    'Viral Centrality': viral_ranking,
+    'Weighted PageRank': weighted_pagerank_ranking,
+    'Prob Degree Centrality': prob_degree_ranking,
+    'Prob Betweenness Centrality': prob_betweenness_ranking,
+    'Prob Closeness Centrality': prob_closeness_ranking
 }
 
-# Extract top 10 from ground truth ranking
-top_10_ground_truth = ground_truth_ranking[:10]
+# Extract top 10% from ground truth ranking
+top_10_percent_index = int(len(ground_truth_ranking) * 0.1)
+top_10_percent_ground_truth = ground_truth_ranking[:top_10_percent_index]
 
 results = []
 for name, ranking in rankings.items():
-    top_10_ranking = ranking[:10]
-    tau, p_value = kendalltau(top_10_ranking, top_10_ground_truth)
+    top_10_percent_ranking = ranking[:top_10_percent_index]
+    tau, p_value = kendalltau(top_10_percent_ranking, top_10_percent_ground_truth)
     results.append([name, tau, p_value])
-    print(f"Kendall's Tau between {name} and ground truth ranking (Top 10): {tau:.3f}")
+    print(f"Kendall's Tau between {name} and ground truth ranking (Top 10%): {tau:.3f}")
     print(f"P-value: {p_value:.3g}")
 
 # Create a DataFrame for the results
@@ -112,12 +241,13 @@ table.scale(1.2, 1.2)  # Adjust the scale of the table
 plt.savefig('centrality_kendall_tau_results.pdf', bbox_inches='tight')
 
 # Debugging Print Statements
-print("Degree Centrality Ranking (Top 10):", degree_ranking[:10])
-print("Betweenness Centrality Ranking (Top 10):", betweenness_ranking[:10])
-print("Closeness Centrality Ranking (Top 10):", closeness_ranking[:10])
-print("Eigenvector Centrality Ranking (Top 10):", eigenvector_ranking[:10])
-print("Viral Centrality Ranking (Top 10):", viral_ranking[:10])
-print("Ground Truth Ranking (Top 10):", top_10_ground_truth)
+print("Eigenvector Centrality Ranking (Top 10%):", eigenvector_ranking[:top_10_percent_index])
+print("Viral Centrality Ranking (Top 10%):", viral_ranking[:top_10_percent_index])
+print("Weighted PageRank Ranking (Top 10%):", weighted_pagerank_ranking[:top_10_percent_index])
+print("Prob Degree Centrality Ranking (Top 10%):", prob_degree_ranking[:top_10_percent_index])
+print("Prob Betweenness Centrality Ranking (Top 10%):", prob_betweenness_ranking[:top_10_percent_index])
+print("Prob Closeness Centrality Ranking (Top 10%):", prob_closeness_ranking[:top_10_percent_index])
+print("Ground Truth Ranking (Top 10%):", top_10_percent_ground_truth)
 
 
 
